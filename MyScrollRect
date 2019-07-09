@@ -1,0 +1,132 @@
+using UnityEngine;
+using System.Collections;
+using UnityEngine.UI;
+using UnityEngine.EventSystems;
+using HorusFW.EventDriven;
+
+namespace Framework
+{
+    public class MyScrollRect : ScrollRect
+    {
+        protected Camera mainCamera = null;
+        protected Camera MainCamera
+        {
+            get
+            {
+                if (mainCamera == null)
+                    mainCamera = Camera.main;
+
+                return mainCamera;
+            }
+        }
+
+        private int touchNum = 0;
+        private float preX;
+        private float preY;
+        private float targetScale = 1f;
+
+        //[SerializeField]
+        private float m_MinScale = 1f;
+        public float minScale { get { return m_MinScale; } set { m_MinScale = value; } }
+
+        //[SerializeField]
+        private float m_MaxScale = 3f;
+        public float maxScale { get { return m_MaxScale; } set { m_MaxScale = value; } }
+
+
+        public TED_VoidMessage BeginDrag = new TED_VoidMessage();
+        public TED_VoidMessage EnDrag = new TED_VoidMessage();
+
+        public override void OnBeginDrag(PointerEventData eventData)
+        {
+            if (Input.touchCount > 1)
+            {
+                return;
+            }
+            //Debug.Log("OnBeginDrag");
+            BeginDrag.Publish();
+            base.OnBeginDrag(eventData);
+        }
+
+        public override void OnDrag(PointerEventData eventData)
+        {
+            if (Input.touchCount > 1)
+            {
+                touchNum = Input.touchCount;
+                return;
+            }
+            else if (Input.touchCount == 1 && touchNum > 1)
+            {
+                touchNum = Input.touchCount;
+                base.OnBeginDrag(eventData);
+                return;
+            }
+            base.OnDrag(eventData);
+        }
+
+        public override void OnEndDrag(PointerEventData eventData)
+        {
+            EnDrag.Publish();
+            base.OnEndDrag(eventData);
+        }
+
+        protected override void LateUpdate()
+        {
+            CheckPinch();
+            base.LateUpdate();
+        }
+
+        void CheckPinch()
+        {
+            if (Input.touchCount == 2)
+            {
+                Touch t1 = Input.GetTouch(0);
+                Touch t2 = Input.GetTouch(1);
+
+                Vector2 p1 = t1.position;
+                Vector2 p2 = t2.position;
+
+                float newX = Mathf.Abs(p1.x - p2.x);
+                float newY = Mathf.Abs(p1.y - p2.y);
+
+                if (t2.phase == TouchPhase.Began)
+                {
+                    preX = newX;
+                    preY = newY;
+                }
+                else if (t1.phase == TouchPhase.Moved && t2.phase == TouchPhase.Moved)
+                {
+                    RectTransform rt = base.content;
+                    float scale = (newX + newY - preX - preY) / (rt.rect.width * 0.9f) + rt.localScale.x;
+
+                    if (scale > minScale && scale < maxScale)
+                    {
+                        Vector2 tOnePrevPos = p1 - t1.deltaPosition;
+                        Vector2 tTwoPrevPos = p2 - t2.deltaPosition;
+
+                        float prevDist = (tOnePrevPos - tTwoPrevPos).magnitude;
+                        float currDist = (p1 - p2).magnitude;
+
+                        float change = currDist - prevDist;
+                        targetScale += 1 * change;
+                        targetScale = Mathf.Clamp(targetScale, minScale, maxScale);
+
+                        Vector2 newCenter = Vector2.zero;
+                        Vector3 newCenterWorld = Vector2.zero;
+                        Rect rect = content.rect;
+
+                        RectTransformUtility.ScreenPointToLocalPointInRectangle(rt, p1, MainCamera, out newCenter);
+                        RectTransformUtility.ScreenPointToWorldPointInRectangle(rt, p1, MainCamera, out newCenterWorld);
+                        Vector2 newPivot = new Vector2(newCenter.x / rect.width, newCenter.y / rect.height);
+                        rt.pivot += newPivot;
+                        rt.localScale = Vector3.Lerp(rt.localScale, new Vector3(targetScale, targetScale, 1f), 5 * Time.deltaTime);
+                        rt.position = newCenterWorld;
+                    }
+                }
+
+                preX = newX;
+                preY = newY;
+            }
+        }
+    }
+}
