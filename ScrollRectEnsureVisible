@@ -1,0 +1,63 @@
+using UnityEngine;
+using UnityEngine.UI;
+
+[RequireComponent(typeof(ScrollRect))]
+public class ScrollRectEnsureVisible : MonoBehaviour
+{
+
+    #region Public Variables
+
+    public float _AnimTime = 0.15f;
+    public bool _Snap = false;
+    public RectTransform _MaskTransform;
+    #endregion
+
+    #region Private Variables
+
+    private ScrollRect mScrollRect;
+    private Transform mScrollTransform;
+    private RectTransform mContent;
+    private Vector3 defaultScale = new Vector3(1.8f, 1.8f, 1.8f);
+    #endregion
+
+    #region Unity Methods
+
+    private void Awake()
+    {
+        mScrollRect = GetComponent<ScrollRect>();
+        mScrollTransform = mScrollRect.transform;
+        mContent = mScrollRect.content;
+    }
+
+    #endregion
+
+    #region Public Methods
+
+    public void CenterOnItem(RectTransform target)
+    {
+        Vector3 localScale = mContent.localScale;
+
+        mContent.localScale = defaultScale;
+
+        Vector3 maskCenterPos = _MaskTransform.position + (Vector3)_MaskTransform.rect.center;
+
+        Vector3 itemCenterPos = target.position;
+
+        Vector3 difference = maskCenterPos - itemCenterPos;
+        difference.z = 0;
+
+        Vector3 newPos = mContent.position + difference;
+
+        if (_Snap)
+        {
+            mContent.position = newPos;
+        }
+        else
+        {
+            mContent.localScale = localScale;
+            LeanTween.scale(mContent.gameObject, defaultScale, _AnimTime);
+            LeanTween.move(mContent.gameObject, newPos, _AnimTime);
+        }
+    }
+    #endregion
+}
